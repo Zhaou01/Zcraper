@@ -4,8 +4,9 @@ const cheerio = require("cheerio");
 const Character = require("./models/character.model");
 
 const url = "https://one-piece.com/log/character.html?p=";
-const articles = [];
 const onePiece = "https://one-piece.com";
+
+const articles = [];
 const charArr = [];
 
 let char = {
