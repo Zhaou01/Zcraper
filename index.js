@@ -2,11 +2,22 @@ const PORT = 8000;
 const express = require("express");
 const app = express();
 
-const db = require("./db");
-//const popuplateDb = require("./populateDb");
+const connectDB = require("./db");
+const populateDb = require("./populateDb");
 
 app.get("/", (req, res) => {
-  res.send("hello world");
+  res.send("Scraper de One Piece 🏴‍☠️");
 });
 
-app.listen(PORT, () => console.log(`server running on PORT ${PORT}`));
+
+const startApp = async () => {
+  await connectDB();
+  
+  app.listen(PORT, () => console.log(`🚀 server running on PORT ${PORT}`));
+
+
+  console.log("🛠️ Iniciando scraper...");
+  await populateDb(); 
+};
+
+startApp();

@@ -1,84 +1,58 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
-const { find } = require("./models/character.model");
-
 const Character = require("./models/character.model");
 
-const url = "https://one-piece.com/log/character.html?p=";
+const urlBase = "https://one-piece.com/character/index.html?sort=desc&include_bounty_none=true&min=0&max=3&orgGroup=0&sortKey=new&page=";
 const onePiece = "https://one-piece.com";
 
-const articles = [];
+const populateDb = async () => {
+  try {
+    for (let i = 1; i <= 41; i++) {
+      console.log(`\n--- 📄 PROCESANDO PÁGINA ${i} ---`);
+      const { data } = await axios.get(urlBase + i);
+      const $ = cheerio.load(data);
 
-let char = {
-  name: "",
-  avatar: "",
-  img: "",
-};
+  
+      const detailLinks = [];
+      $(".p-character-list__item a").each((_, el) => {
+        detailLinks.push(onePiece + $(el).attr("href"));
+      });
 
-const dataForScrap = async () => {
-  for (let i = 1; i < 39; i++) {
-    n = i;
-    await axios(url + n)
-      .then((response) => {
-        const html = response.data;
-        const $ = cheerio.load(html);
-        return $(".listArea > ul > li", html).each(function () {
-          const imgUrl = $(this).find("a").attr("href");
-          const link = onePiece + imgUrl;
-          articles.push({
-            link,
-          });
-        });
-      })
-      .catch((err) => console.log(err));
+
+      for (const link of detailLinks) {
+        try {
+          const detailRes = await axios.get(link);
+          const $detail = cheerio.load(detailRes.data);
+
+          const charData = {
+            name: $detail(".p-character-detail__name").text().trim(),
+            avatar: onePiece + $detail(".p-character-detail__img img").attr("src"),
+            img: onePiece + $detail(".p-character-detail__body-img img").attr("src"),
+          };
+
+  
+          const exists = await Character.findOne({ name: charData.name });
+
+          if (!exists) {
+            const newChar = new Character(charData);
+            await newChar.save();
+            console.log(`✨ Guardado: ${charData.name}`);
+          } else {
+            console.log(`⏩ Saltado (ya existe): ${charData.name}`);
+          }
+
+     
+          await new Promise(r => setTimeout(r, 500));
+
+        } catch (error) {
+          console.log(`❌ Error procesando detalle ${link}:`, error.message);
+        }
+      }
+    }
+    console.log("\n✅ ¡Base de datos poblada con éxito!");
+  } catch (err) {
+    console.error("🔴 Error global en el scraper:", err);
   }
 };
-dataForScrap().finally(() => {
-  const imgscrap = async () => {
-    const ir = "link";
-    const filtro = articles.filter((link) => link !== ir);
 
-    for (let i = 0; i < filtro.length; i++) {
-      await axios(filtro[i].link).then((response) => {
-        const html = response.data;
-        const $ = cheerio.load(html);
-        $(".thumbBox > p ", html).each(function () {
-          const avatar = $(this).find("img").attr("src");
-          char.avatar = onePiece + avatar;
-        }),
-          $(".contDerail > p ", html).each(function () {
-            const imagen = $(this).find("img").attr("src");
-            const charName = filtro[i].link
-              .split("/detail/")[1]
-              .split(".html")[0];
-            const charImg = onePiece + imagen;
-            char.name = charName;
-            char.img = charImg;
-          });
-      });
-      console.log(char);
-
-      Character.find(
-        { avatar: char.avatar },
-        { name: 0, img: 0 },
-        function (err, docs) {
-          if (err) {
-            console.log(err);
-          } else {
-            console.log("Second function call: ", docs);
-          }
-          if (docs.length < 1) {
-            console.log("se guarda");
-            const character = new Character(char);
-            character.save(function (err, doc) {
-              console.log(doc.id);
-            });
-          } else {
-            console.log("no se guarda nada");
-          }
-        }
-      );
-    }
-  };
-  imgscrap();
-});
+module.exports = populateDb;
